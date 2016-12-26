@@ -1,0 +1,46 @@
+
+* Daily Quote
+2014-12-05
+http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX3_print.php?genpage=genpage/Report201412/A11220141205ALLBUT0999_1.php&type=csv
+
+* QFII
+daily 2014-12-05
+http://www.tse.com.tw/ch/trading/fund/T86/print.php?edition=ch&filename=genpage/201412/20141205_2by_stkno.dat&type=csv&select2=ALLBUT0999&qdate=20141205
+
+holding 2014-12-05
+
+http://www.tse.com.tw/ch/trading/fund/MI_QFIIS/MI_QFIIS_print.php?begin_date=20141205&category=ALLBUT0999&order_by=SortByStockCode&language=ch&save=csv
+
+* Revenue (xls format)
+http://www.twse.com.tw/ch/statistics/statistics_list.php?tm=04&stm=003
+
+2014 July revenue
+http://www.twse.com.tw/ch/statistics/download/04/003/201407_C04003.zip
+
+* Name & Code
+http://isin.twse.com.tw/isin/C_public.jsp?strMode=2
+
+* Finacial Report
+stockcode = 2330 2014 Q3
+http://mops.twse.com.tw/server-java/t164sb01?step=1&CO_ID=2330&SYEAR=2014&SSEASON=3&REPORT_ID=C
+
+
+2016-11-04
+Daily Quote
+POST /ch/trading/exchange/MI_INDEX/MI_INDEX.php HTTP/1.1
+download=&qdate=105%2F11%2F04&selectType=ALLBUT0999
+
+curl -o test.csv "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php?download=csv&qdate=105%2F11%2F04&selectType=ALLBUT0999"
+curl -o test.csv --data "download=csv&qdate=105/11/04&selectType=ALLBUT0999" "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php"
+curl -o test.csv --data "download=csv&qdate=105/11/04&selectType=01" "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php"
+
+
+POST /en/trading/exchange/MI_INDEX/MI_INDEX.php HTTP/1.1
+download=csv&qdate=2016%2F11%2F04&selectType=01
+
+iconv -c -f BIG5 -t UTF8 test.csv > test-utf8.csv
+
+* Revenue (Monthly)
+公開資訊觀測站 彙總報表
+http://mops.twse.com.tw/nas/t21/sii/t21sc03_105_10_0.html
+
