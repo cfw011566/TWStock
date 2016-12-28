@@ -43,13 +43,14 @@ func main() {
 	month := time.Now().Month()
 	day := time.Now().Day()
 	if day < 10 {
-		month -= 1
-		if month <= 0 {
-			month += 12
-			year -= 1
-		}
+		return
 	}
 	year -= 1911
+	month -= 1
+	if month <= 0 {
+		month += 12
+		year -= 1
+	}
 
 	for _, market := range markets {
 		url := fmt.Sprintf(revenueURLBase, market, year, month, 0)
