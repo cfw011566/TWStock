@@ -1,0 +1,73 @@
+
+* Daily Quote
+2014-12-05
+http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX3_print.php?genpage=genpage/Report201412/A11220141205ALLBUT0999_1.php&type=csv
+
+* QFII
+daily 2014-12-05
+http://www.tse.com.tw/ch/trading/fund/T86/print.php?edition=ch&filename=genpage/201412/20141205_2by_stkno.dat&type=csv&select2=ALLBUT0999&qdate=20141205
+
+holding 2014-12-05
+
+http://www.tse.com.tw/ch/trading/fund/MI_QFIIS/MI_QFIIS_print.php?begin_date=20141205&category=ALLBUT0999&order_by=SortByStockCode&language=ch&save=csv
+
+* Revenue (xls format)
+http://www.twse.com.tw/ch/statistics/statistics_list.php?tm=04&stm=003
+
+2014 July revenue
+http://www.twse.com.tw/ch/statistics/download/04/003/201407_C04003.zip
+
+* Name & Code
+http://isin.twse.com.tw/isin/C_public.jsp?strMode=2
+
+* Finacial Report
+stockcode = 2330 2014 Q3
+http://mops.twse.com.tw/server-java/t164sb01?step=1&CO_ID=2330&SYEAR=2014&SSEASON=3&REPORT_ID=C
+
+
+2016-11-04
+Daily Quote
+POST /ch/trading/exchange/MI_INDEX/MI_INDEX.php HTTP/1.1
+download=&qdate=105%2F11%2F04&selectType=ALLBUT0999
+
+curl -o test.csv "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php?download=csv&qdate=105%2F11%2F04&selectType=ALLBUT0999"
+curl -o test.csv --data "download=csv&qdate=105/11/04&selectType=ALLBUT0999" "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php"
+curl -o test.csv --data "download=csv&qdate=105/11/04&selectType=01" "http://www.tse.com.tw/ch/trading/exchange/MI_INDEX/MI_INDEX.php"
+
+
+POST /en/trading/exchange/MI_INDEX/MI_INDEX.php HTTP/1.1
+download=csv&qdate=2016%2F11%2F04&selectType=01
+
+iconv -c -f BIG5 -t UTF8 test.csv > test-utf8.csv
+
+* Revenue (Monthly)
+公開資訊觀測站 彙總報表
+http://mops.twse.com.tw/nas/t21/sii/t21sc03_105_10_0.html
+
+
+
+2017-09-01
+
+Daily Quote
+curl -o daily.csv "http://www.twse.com.tw/exchangeReport/MI_INDEX?response=csv&date=20170831&type=ALLBUT0999"
+curl -o daily01.json "http://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=20170831&type=01"
+
+QFII
+GET /fund/T86?response=json&date=20170901&selectType=ALLBUT0999&_=1504488480804
+GET /fund/T86?response=csv&date=20170901&selectType=ALLBUT0999
+curl -o qfii.json "http://www.twse.com.tw/fund/T86?response=json&date=20170901&selectType=ALLBUT0999"
+
+Realtime
+curl "http://mis.twse.com.tw/stock/api/getStock.jsp?ch=2330.tw&json=1"
+{"msgArray":[{"ex":"tse","d":"20170906","it":"12","n":"台積電","i":"24","ip":"0","w":"196.50","u":"239.50","t":"07:50:00","p":"0","ch":"2330.tw","key":"tse_2330.tw","y":"218.00"}],"rtmessage":"OK","queryTime":{"stockDetail":848,"totalMicroTime":848},"rtcode":"0000"}
+y : 參考價
+w : 跌停
+u : 漲停
+
+curl "http://mis.twse.com.tw/stock/api/getStockNames.jsp?n=2330"
+{"datas":[{"c":"2330","n":"台積電","key":"tse_2330.tw_20170906"},{"c":"03025P","n":"台積電元大6A售06","key":"tse_03025P.tw_20170906"},{"c":"03041P","n":"台積電元大6A售07","key":"tse_03041P.tw_20170906"},{"c":"03076P","n":"台積電統一6B售05","key":"tse_03076P.tw_20170906"},{"c":"03077P","n":"台積電群益6B售08","key":"tse_03077P.tw_20170906"},{"c":"03089P","n":"台積電富邦6C售02","key":"tse_03089P.tw_20170906"},{"c":"03130P","n":"台積電群益6B售09","key":"tse_03130P.tw_20170906"},{"c":"03131P","n":"台積電群益6B售10","key":"tse_03131P.tw_20170906"},....  ],"rtmessage":"Success","rtcode":"0000"}
+
+curl -o fibest2330.html "http://mis.twse.com.tw/stock/fibest.jsp?stock=2330"
+
+
+{"msgArray":[{"ts":"0","tk0":"2330.tw_tse_20170906_B_9999715595","tk1":"2330.tw_tse_20170906_B_9999715281","tlong":"1504662735000","f":"1552_1105_1406_735_975_","ex":"tse","g":"920_610_969_1630_958_","d":"20170906","it":"12","b":"217.50_217.00_216.50_216.00_215.50_","c":"2330","mt":"785909","a":"218.00_218.50_219.00_219.50_220.00_","n":"å<8f>°ç©<8d>é<9b>»","o":"216.50","l":"216.00","h":"218.00","ip":"0","i":"24","w":"196.50","v":"2734","u":"239.50","t":"09:52:15","s":"0","pz":"216.00","tv":"30","p":"0","nf":"å<8f>°ç<81>£ç©<8d>é«<94>é<9b>»è·¯è£½é<80> è<82>¡ä»½æ<9c><89>é<99><90>å<85>¬å<8f>¸","ch":"2330.tw","z":"217.50","y":"218.00","ps":"783"}],"userDelay":5000,"rtmessage":"OK","referer":"http://mis.twse.com.tw/stock/fibest.jsp?stock=2330","queryTime":{"sysTime":"09:52:17","sessionLatestTime":1504662731341,"sysDate":"20170906","sessionKey":"tse_2330.tw_20170906|","sessionFromTime":1504662731341,"stockInfoItem":1542,"showChart":false,"sessionStr":"UserSession","stockInfo":250856},"rtcode":"0000"}
