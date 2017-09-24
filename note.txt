@@ -71,3 +71,15 @@ curl -o fibest2330.html "http://mis.twse.com.tw/stock/fibest.jsp?stock=2330"
 
 
 {"msgArray":[{"ts":"0","tk0":"2330.tw_tse_20170906_B_9999715595","tk1":"2330.tw_tse_20170906_B_9999715281","tlong":"1504662735000","f":"1552_1105_1406_735_975_","ex":"tse","g":"920_610_969_1630_958_","d":"20170906","it":"12","b":"217.50_217.00_216.50_216.00_215.50_","c":"2330","mt":"785909","a":"218.00_218.50_219.00_219.50_220.00_","n":"å<8f>°ç©<8d>é<9b>»","o":"216.50","l":"216.00","h":"218.00","ip":"0","i":"24","w":"196.50","v":"2734","u":"239.50","t":"09:52:15","s":"0","pz":"216.00","tv":"30","p":"0","nf":"å<8f>°ç<81>£ç©<8d>é«<94>é<9b>»è·¯è£½é<80> è<82>¡ä»½æ<9c><89>é<99><90>å<85>¬å<8f>¸","ch":"2330.tw","z":"217.50","y":"218.00","ps":"783"}],"userDelay":5000,"rtmessage":"OK","referer":"http://mis.twse.com.tw/stock/fibest.jsp?stock=2330","queryTime":{"sysTime":"09:52:17","sessionLatestTime":1504662731341,"sysDate":"20170906","sessionKey":"tse_2330.tw_20170906|","sessionFromTime":1504662731341,"stockInfoItem":1542,"showChart":false,"sessionStr":"UserSession","stockInfo":250856},"rtcode":"0000"}
+
+
+2017-09-23
+
+Margin Transactions
+Purchase on Margin 融資
+New 買進, Redemption 賣出, Outstanding 現金償還, Yesterday Remain 前日餘額, Today Remain 今日餘額, Today Limit 限額
+
+Short Sale 融券
+Redemption 買進, New 賣出, Outstanding 現金償還, Yesterday Remain 前日餘額, Today Remain 今日餘額, Today Limit 限額
+
+curl -o margin.json "http://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date=20170922&selectType=ALL"
