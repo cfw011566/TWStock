@@ -16,6 +16,7 @@ import (
 )
 
 const urlTSEDailyQuote = "http://www.twse.com.tw/exchangeReport/MI_INDEX?response=json&date=%4d%02d%02d&type=ALLBUT0999"
+const urlTSEDailySubTrade = "http://www.twse.com.tw//exchangeReport/BFIAMU?response=json&date=%4d%02d%02d"
 const kMinSize = 1024
 const kMinDate = 20000000
 
@@ -27,16 +28,25 @@ const (
 )
 
 type DailyQuote struct {
-	Date   string
-	Fields []string   `json:"fields1"`
-	Data   [][]string `json:"data5"`
+	Date    string
+	Fields  []string        `json:"fields1"`
+	Data    [][]string      `json:"data5"`
+	Indices [][]string      `json:"data1"`
+	Trades  [][]interface{} `json:"data3"`
 }
+
+type DailySubTrade struct {
+	Date   string
+	Trades [][]string `json:"data"`
+}
+
+var dailyQuote DailyQuote
+var dailySubTrade DailySubTrade
+var indexCodes map[string]string
 
 var flagFromDate = flag.Int("f", 0, "from date YYYYMMDD (default: the day after latest trade date in DB)")
 var flagToDate = flag.Int("t", 0, "to date YYYYMMDD (default: today)")
 var flagLastTradeDay = flag.Bool("l", false, "last trade day only")
-
-var daily DailyQuote
 
 func main() {
 	flag.Parse()
@@ -52,11 +62,15 @@ func main() {
 		return
 	}
 
+	if indexCodes = readIndexCode(db); len(indexCodes) == 0 {
+		return
+	}
+
 	today := time.Now()
 	fromDate := *flagFromDate
 	toDate := *flagToDate
 	if fromDate == 0 || fromDate < kMinDate {
-		fromDate, err = getLastTradeDate(db)
+		fromDate, err = fetchLastTradeDate(db)
 		if err != nil {
 			fromDate = today.Year()*10000 + int(today.Month())*100 + today.Day()
 		}
@@ -82,10 +96,13 @@ func main() {
 	log.Println("beginDate = ", beginDate)
 	for quoteDate.After(beginDate) {
 		log.Println(quoteDate)
-		ok, quotes := getDailyQuotes(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
-		if ok {
+		ok, quotes := fetchDailyQuotes(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		ok2, subTrades := fetchDailySubTrades(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		if ok && ok2 {
 			//printDailyQuotes(quotes)
+			//printDailySubTrades(subTrades)
 			writeDailyQuotes(db, quotes)
+			writeDailyIndices(db, quotes, subTrades)
 			if *flagLastTradeDay {
 				break
 			}
@@ -146,7 +163,7 @@ func printDailyQuotes(quotes *DailyQuote) {
 	}
 }
 
-func getLastTradeDate(db *sql.DB) (int, error) {
+func fetchLastTradeDate(db *sql.DB) (int, error) {
 	var row1 string
 	sqlString := "SELECT to_char(MAX(trade_date)+interval '1 day', 'YYYYMMDD') FROM daily_quotes"
 	err := db.QueryRow(sqlString).Scan(&row1)
@@ -158,7 +175,7 @@ func getLastTradeDate(db *sql.DB) (int, error) {
 	return strconv.Atoi(row1)
 }
 
-func getDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
+func fetchDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
 	var url string
 	var contents []byte
 
@@ -190,11 +207,172 @@ func getDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
 		return false, nil
 	}
 
-	err = json.Unmarshal(contents, &daily)
+	err = json.Unmarshal(contents, &dailyQuote)
 	if err != nil {
 		log.Println("json unmarshal: ", err)
 		return false, nil
 	}
 
-	return true, &daily
+	return true, &dailyQuote
+}
+
+func fetchDailySubTrades(year int, month int, day int) (bool, *DailySubTrade) {
+	var url string
+	var contents []byte
+
+	url = fmt.Sprintf(urlTSEDailySubTrade, year, month, day)
+	log.Println(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return false, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, nil
+	}
+
+	contents, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return false, nil
+	}
+
+	log.Println("----")
+	log.Println(resp.StatusCode)
+	log.Println(resp.Status)
+	log.Println("Body len = ", len(contents))
+
+	if len(contents) < kMinSize {
+		return false, nil
+	}
+
+	err = json.Unmarshal(contents, &dailySubTrade)
+	if err != nil {
+		log.Println("json unmarshal: ", err)
+		return false, nil
+	}
+
+	return true, &dailySubTrade
+}
+
+func writeDailyIndices(db *sql.DB, quotes *DailyQuote, subTrades *DailySubTrade) bool {
+	//	var lastInsertId string
+
+	sqlString := "DELETE FROM daily_indices WHERE trade_date='" + quotes.Date + "';"
+	//err := db.QueryRow(sqlString).Scan(&lastInsertId)
+	result, err := db.Exec(sqlString)
+	log.Println(result)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("DELETE error = %v\n", err)
+		return false
+	}
+
+	sqlString = "INSERT INTO daily_indices (trade_date, security_code, index_value, trade_volume, trade_amount, trade_count) VALUES\n"
+	for name, code := range indexCodes {
+		//sqlString += fmt.Sprintf("('%s','%s',", quotes.Date, code)
+		if code == "index01" {
+			indexValue, ok := getIndexValue(name, quotes)
+			tradeVolume, tradeAmount, tradeCount, ok2 := getIndexTrade(quotes)
+			if !ok || !ok2 {
+				continue
+			}
+			sqlString += fmt.Sprintf("('%s','%s',", quotes.Date, code)
+			sqlString += fmt.Sprintf("'%s','%s','%s','%s'),\n", indexValue, tradeVolume, tradeAmount, tradeCount)
+		} else if strings.HasPrefix(code, "index") {
+			indexValue, ok := getIndexValue(name, quotes)
+			if !ok {
+				continue
+			}
+			sqlString += fmt.Sprintf("('%s','%s',", quotes.Date, code)
+			sqlString += fmt.Sprintf("'%s',null,null,null),\n", indexValue)
+		} else {
+			indexValue, ok := getIndexValue(name, quotes)
+			tradeVolume, tradeAmount, tradeCount, ok2 := getSubTrade(name, subTrades)
+			if !ok || !ok2 {
+				continue
+			}
+			sqlString += fmt.Sprintf("('%s','%s',", quotes.Date, code)
+			sqlString += fmt.Sprintf("'%s','%s','%s','%s'),\n", indexValue, tradeVolume, tradeAmount, tradeCount)
+		}
+	}
+	sqlString = strings.TrimRight(sqlString, ",\n") + ";"
+	//fmt.Println(sqlString)
+	result, err = db.Exec(sqlString)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+	return true
+}
+
+func printDailySubTrades(quotes *DailySubTrade) {
+	log.Println(quotes.Date)
+	for _, quote := range quotes.Trades {
+		for _, field := range quote {
+			fmt.Print(strings.Replace(field, ",", "", -1))
+			fmt.Print("\t")
+		}
+		fmt.Println()
+	}
+}
+
+func readIndexCode(db *sql.DB) map[string]string {
+	sqlString := "SELECT * FROM indices;"
+	rows, err := db.Query(sqlString)
+	if err != nil && err != sql.ErrNoRows {
+		log.Println(err)
+		return nil
+	}
+	defer rows.Close()
+
+	codes := make(map[string]string)
+	for rows.Next() {
+		var code string
+		var name string
+		if err := rows.Scan(&code, &name); err != nil {
+			log.Fatal(err)
+		}
+		//fmt.Printf("code %s name is %s\n", code, name)
+		codes[name] = code
+	}
+
+	return codes
+}
+
+func getIndexValue(name string, quotes *DailyQuote) (string, bool) {
+	if strings.HasPrefix(name, "觀光") {
+		name = strings.Replace(name, "事業", "", -1)
+	}
+	for _, index := range quotes.Indices {
+		if index[0] == name {
+			return strings.Replace(index[1], ",", "", -1), true
+		}
+	}
+	return "", false
+}
+
+func getIndexTrade(quotes *DailyQuote) (string, string, string, bool) {
+	for _, trade := range quotes.Trades {
+		if strings.HasPrefix(trade[0].(string), "總計") {
+			tradeAmount := strings.Replace(trade[1].(string), ",", "", -1)
+			tradeVolume := strings.Replace(trade[2].(string), ",", "", -1)
+			tradeCount := strings.Replace(trade[3].(string), ",", "", -1)
+			return tradeVolume, tradeAmount, tradeCount, true
+		}
+	}
+	return "", "", "", false
+}
+
+func getSubTrade(name string, quotes *DailySubTrade) (string, string, string, bool) {
+	for _, trade := range quotes.Trades {
+		if strings.HasPrefix(trade[0], name) {
+			tradeAmount := strings.Replace(trade[1], ",", "", -1)
+			tradeVolume := strings.Replace(trade[2], ",", "", -1)
+			tradeCount := strings.Replace(trade[3], ",", "", -1)
+			return tradeVolume, tradeAmount, tradeCount, true
+		}
+	}
+	return "", "", "", false
 }
