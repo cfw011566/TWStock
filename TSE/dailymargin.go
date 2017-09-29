@@ -107,11 +107,11 @@ func writeDailyMarginShort(db *sql.DB, quotes *DailyMarginShort) bool {
 	}
 
 	// "fields":["股票代號","股票名稱","買進","賣出","現金償還","前日餘額","今日餘額","限額","買進","賣出","現金償還","前日餘額","今日餘額","限額","資券互抵","註記"]
-	sqlString = "INSERT INTO daily_margin_short (trade_date, security_code, margin_new, margin_redemption, margin_outstanding, margin_remain, margin_limit, short_redemption, short_new, short_outstanding, short_remain, short_limit, margin_and_short) VALUES\n"
+	sqlString = "INSERT INTO daily_margin_short (trade_date, security_code, margin_new, margin_redemption, margin_outstanding, margin_last_remain, margin_remain, margin_limit, short_redemption, short_new, short_outstanding, short_last_remain, short_remain, short_limit, margin_and_short) VALUES\n"
 	for _, quote := range quotes.Data {
 		sqlString += fmt.Sprintf("('%s',", quotes.Date)
 		for i := 0; i < len(quote); i++ {
-			if i == 1 || i == 5 || i == 11 || i == 15 {
+			if i == 1 || i == 15 {
 				continue
 			}
 			if strings.Contains(quote[i], "--") || len(quote[i]) == 0 {
