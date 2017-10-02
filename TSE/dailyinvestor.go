@@ -76,13 +76,13 @@ func main() {
 	if *flagLastTradeDay {
 		quoteDate = today
 	} else {
-		quoteDate = time.Date(toDate/10000, time.Month(toDate%1000/100), toDate%100, 1, 0, 0, 0, local)
+		quoteDate = time.Date(toDate/10000, time.Month(toDate%10000/100), toDate%100, 1, 0, 0, 0, local)
 	}
-	beginDate = time.Date(fromDate/10000, time.Month(fromDate%1000/100), fromDate%100, 0, 0, 0, 0, local)
+	beginDate = time.Date(fromDate/10000, time.Month(fromDate%10000/100), fromDate%100, 0, 0, 0, 0, local)
 	log.Println("beginDate = ", beginDate)
 	for quoteDate.After(beginDate) {
 		log.Println(quoteDate)
-		ok, quotes := getDailyInvestors(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		quotes, ok := getDailyInvestors(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if ok {
 			writeDailyInvestors(db, quotes)
 			//printDailyInvestors(quotes)
@@ -155,7 +155,7 @@ func getLastTradeDate(db *sql.DB) (int, error) {
 	return strconv.Atoi(row1)
 }
 
-func getDailyInvestors(year int, month int, day int) (bool, *DailyInvestor) {
+func getDailyInvestors(year int, month int, day int) (*DailyInvestor, bool) {
 	var url string
 	var contents []byte
 
@@ -164,18 +164,18 @@ func getDailyInvestors(year int, month int, day int) (bool, *DailyInvestor) {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, nil
+		return nil, false
 	}
 
 	contents, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 
 	log.Println("----")
@@ -184,14 +184,14 @@ func getDailyInvestors(year int, month int, day int) (bool, *DailyInvestor) {
 	log.Println("Body len = ", len(contents))
 
 	if len(contents) < kMinSize {
-		return false, nil
+		return nil, false
 	}
 
 	err = json.Unmarshal(contents, &dailyInvestor)
 	if err != nil {
 		log.Println("json unmarshal: ", err)
-		return false, nil
+		return nil, false
 	}
 
-	return true, &dailyInvestor
+	return &dailyInvestor, true
 }

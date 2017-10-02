@@ -90,14 +90,14 @@ func main() {
 	if *flagLastTradeDay {
 		quoteDate = today
 	} else {
-		quoteDate = time.Date(toDate/10000, time.Month(toDate%1000/100), toDate%100, 1, 0, 0, 0, local)
+		quoteDate = time.Date(toDate/10000, time.Month(toDate%10000/100), toDate%100, 1, 0, 0, 0, local)
 	}
-	beginDate = time.Date(fromDate/10000, time.Month(fromDate%1000/100), fromDate%100, 0, 0, 0, 0, local)
+	beginDate = time.Date(fromDate/10000, time.Month(fromDate%10000/100), fromDate%100, 0, 0, 0, 0, local)
 	log.Println("beginDate = ", beginDate)
 	for quoteDate.After(beginDate) {
 		log.Println(quoteDate)
-		ok, quotes := fetchDailyQuotes(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
-		ok2, subTrades := fetchDailySubTrades(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		quotes, ok := fetchDailyQuotes(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		subTrades, ok2 := fetchDailySubTrades(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if ok && ok2 {
 			//printDailyQuotes(quotes)
 			//printDailySubTrades(subTrades)
@@ -175,7 +175,7 @@ func fetchLastTradeDate(db *sql.DB) (int, error) {
 	return strconv.Atoi(row1)
 }
 
-func fetchDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
+func fetchDailyQuotes(year int, month int, day int) (*DailyQuote, bool) {
 	var url string
 	var contents []byte
 
@@ -184,18 +184,18 @@ func fetchDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, nil
+		return nil, false
 	}
 
 	contents, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 
 	log.Println("----")
@@ -204,19 +204,19 @@ func fetchDailyQuotes(year int, month int, day int) (bool, *DailyQuote) {
 	log.Println("Body len = ", len(contents))
 
 	if len(contents) < kMinSize {
-		return false, nil
+		return nil, false
 	}
 
 	err = json.Unmarshal(contents, &dailyQuote)
 	if err != nil {
 		log.Println("json unmarshal: ", err)
-		return false, nil
+		return nil, false
 	}
 
-	return true, &dailyQuote
+	return &dailyQuote, true
 }
 
-func fetchDailySubTrades(year int, month int, day int) (bool, *DailySubTrade) {
+func fetchDailySubTrades(year int, month int, day int) (*DailySubTrade, bool) {
 	var url string
 	var contents []byte
 
@@ -225,18 +225,18 @@ func fetchDailySubTrades(year int, month int, day int) (bool, *DailySubTrade) {
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return false, nil
+		return nil, false
 	}
 
 	contents, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
-		return false, nil
+		return nil, false
 	}
 
 	log.Println("----")
@@ -245,16 +245,16 @@ func fetchDailySubTrades(year int, month int, day int) (bool, *DailySubTrade) {
 	log.Println("Body len = ", len(contents))
 
 	if len(contents) < kMinSize {
-		return false, nil
+		return nil, false
 	}
 
 	err = json.Unmarshal(contents, &dailySubTrade)
 	if err != nil {
 		log.Println("json unmarshal: ", err)
-		return false, nil
+		return nil, false
 	}
 
-	return true, &dailySubTrade
+	return &dailySubTrade, true
 }
 
 func writeDailyIndices(db *sql.DB, quotes *DailyQuote, subTrades *DailySubTrade) bool {
