@@ -158,7 +158,7 @@ func getLastTradeDate(db *sql.DB) (int, error) {
 	return strconv.Atoi(row1)
 }
 
-func getDailyMarginShort(year int, month int, day int) (*DailyMarginShort, ok) {
+func getDailyMarginShort(year int, month int, day int) (*DailyMarginShort, bool) {
 	var url string
 	var contents []byte
 
