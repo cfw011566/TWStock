@@ -19,7 +19,6 @@ const urlTSEIndexValue = "http://www.twse.com.tw/indicesReport/MI_5MINS_HIST?res
 const urlTSEIndexTrade = "http://www.twse.com.tw/exchangeReport/FMTQIK?response=json&date=%4d%02d%02d"
 const urlTSEIndexInvestor = "http://www.twse.com.tw/fund/BFI82U?response=json&dayDate=%4d%02d%02d&type=day"
 const urlTSEIndexMarginShort = "http://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date=%4d%02d%02d&selectType=MS"
-const kMinSize = 1024
 const kMinDate = 20000000
 
 const (
@@ -31,24 +30,44 @@ const (
 
 const indexCose = "TAIEX"
 
-type IndexValue struct {
-	Date string
-	Data [][]string `json:"data"`
+type jsonContent struct {
+	Status string `json:"stat"`
+	Date   string
+	Data   [][]string `json:"data"`
 }
 
-type IndexTrade struct {
-	Date  string
-	Trade [][]string `json:"data"`
+type jsonContent2 struct {
+	Status string `json:"stat"`
+	Date   string
+	Data   [][]string `json:"creditList"`
+}
+
+type Investor struct {
+	Buy        string
+	Sell       string
+	Difference string
 }
 
 type IndexInvestor struct {
-	Date     string
-	Investor [][]string `json:"data"`
+	DealerSelf  Investor
+	DealerHedge Investor
+	Trust       Investor
+	Foreign     Investor
+	Total       Investor
+}
+
+type MarginShortFields struct {
+	TodayNew    string
+	Redemption  string
+	Outstanding string
+	LastRemain  string
+	TodayRemain string
 }
 
 type IndexMarginShort struct {
-	Date   string
-	Margin [][]string `json:"creditList"`
+	Margin      MarginShortFields
+	Short       MarginShortFields
+	MarginValue MarginShortFields
 }
 
 var flagFromDate = flag.Int("f", 0, "from date YYYYMMDD (default: the day after latest trade date in DB)")
@@ -98,12 +117,40 @@ func main() {
 	beginDate = time.Date(fromDate/10000, time.Month(fromDate%10000/100), fromDate%100, 0, 0, 0, 0, local)
 	log.Println("beginDate = ", beginDate)
 	for quoteDate.After(beginDate) {
-		log.Println(quoteDate)
+		fmt.Println("-------")
+		fmt.Println(quoteDate)
+		time.Sleep(100 * time.Millisecond)
 		o, h, l, c, ok := fetchIndexValue(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if !ok {
-			break
+			log.Println(o, h, l, c)
+			quoteDate = quoteDate.AddDate(0, 0, -1)
+			continue
+		}
+		time.Sleep(100 * time.Millisecond)
+		volume, amount, count, ok := fetchIndexTrade(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		if !ok {
+			log.Println(volume, amount, count)
+			quoteDate = quoteDate.AddDate(0, 0, -1)
+			continue
+		}
+		time.Sleep(100 * time.Millisecond)
+		indexInvestor, ok := fetchIndexInvestor(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		if !ok {
+			log.Println(indexInvestor)
+			quoteDate = quoteDate.AddDate(0, 0, -1)
+			continue
+		}
+		time.Sleep(100 * time.Millisecond)
+		indexMarginShort, ok := fetchIndexMarginShort(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		if !ok {
+			log.Println(indexInvestor)
+			quoteDate = quoteDate.AddDate(0, 0, -1)
+			continue
 		}
 		fmt.Println(o, h, l, c)
+		fmt.Println(volume, amount, count)
+		fmt.Println(indexInvestor)
+		fmt.Println(indexMarginShort)
 		if *flagLastTradeDay {
 			break
 		}
@@ -123,33 +170,11 @@ func fetchLastTradeDate(db *sql.DB) (int, error) {
 	return strconv.Atoi(row1)
 }
 
-func readIndexCode(db *sql.DB) map[string]string {
-	sqlString := "SELECT * FROM indices;"
-	rows, err := db.Query(sqlString)
-	if err != nil && err != sql.ErrNoRows {
-		log.Println(err)
-		return nil
-	}
-	defer rows.Close()
-
-	codes := make(map[string]string)
-	for rows.Next() {
-		var code string
-		var name string
-		if err := rows.Scan(&code, &name); err != nil {
-			log.Fatal(err)
-		}
-		//fmt.Printf("code %s name is %s\n", code, name)
-		codes[name] = code
-	}
-
-	return codes
-}
-
-func fetchIndexValue(year int, month int, day int) (float64, float64, float64, float64, bool) {
+func fetchIndexValue(year int, month int, day int) (string, string, string, string, bool) {
 	var url string
 	var contents []byte
-	var o, h, l, c float64
+	var o, h, l, c string
+	var jsonData jsonContent
 
 	url = fmt.Sprintf(urlTSEIndexValue, year, month, day)
 	log.Println(url)
@@ -175,42 +200,235 @@ func fetchIndexValue(year int, month int, day int) (float64, float64, float64, f
 	log.Println(resp.Status)
 	log.Println("Body len = ", len(contents))
 
-	if len(contents) < kMinSize {
-		return o, h, l, c, false
-	}
-
-	var indexValue IndexValue
-	err = json.Unmarshal(contents, &indexValue)
+	err = json.Unmarshal(contents, &jsonData)
 	if err != nil {
 		log.Println("json unmarshal: ", err)
 		return o, h, l, c, false
 	}
 
+	if jsonData.Status != "OK" {
+		log.Println("stat: ", jsonData.Status)
+		return o, h, l, c, false
+	}
+
 	dateTW := fmt.Sprintf("%3d/%02d/%02d", year-1911, month, day)
-	fmt.Println(dateTW)
-	for _, data := range indexValue.Data {
+	//fmt.Println(dateTW)
+	for _, data := range jsonData.Data {
 		for i := 0; i < len(data); i++ {
 			if data[0] == dateTW {
-				fmt.Println(data)
-				v := strings.Replace(data[1], ",", "", -1)
-				if o, err := strconv.ParseFloat(v, 64); err == nil {
-					return o, h, l, c, false
-				}
-				v = strings.Replace(data[2], ",", "", -1)
-				if h, err := strconv.ParseFloat(v, 64); err == nil {
-					return o, h, l, c, false
-				}
-				v = strings.Replace(data[3], ",", "", -1)
-				if l, err := strconv.ParseFloat(v, 64); err == nil {
-					return o, h, l, c, false
-				}
-				v = strings.Replace(data[4], ",", "", -1)
-				if c, err := strconv.ParseFloat(v, 64); err == nil {
-					return o, h, l, c, false
-				}
+				//fmt.Println(data)
+				o = strings.Replace(data[1], ",", "", -1)
+				h = strings.Replace(data[2], ",", "", -1)
+				l = strings.Replace(data[3], ",", "", -1)
+				c = strings.Replace(data[4], ",", "", -1)
+				break
 			}
 		}
 	}
 
 	return o, h, l, c, true
+}
+
+func fetchIndexTrade(year int, month int, day int) (string, string, string, bool) {
+	var url string
+	var contents []byte
+	var volume, amount, count string
+	var jsonData jsonContent
+
+	url = fmt.Sprintf(urlTSEIndexTrade, year, month, day)
+	log.Println(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return volume, amount, count, false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return volume, amount, count, false
+	}
+
+	contents, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return volume, amount, count, false
+	}
+
+	log.Println("----")
+	log.Println(resp.StatusCode)
+	log.Println(resp.Status)
+	log.Println("Body len = ", len(contents))
+
+	err = json.Unmarshal(contents, &jsonData)
+	if err != nil {
+		log.Println("json unmarshal: ", err)
+		return volume, amount, count, false
+	}
+
+	if jsonData.Status != "OK" {
+		log.Println("stat: ", jsonData.Status)
+		return volume, amount, count, false
+	}
+
+	dateTW := fmt.Sprintf("%3d/%02d/%02d", year-1911, month, day)
+	//fmt.Println(dateTW)
+	for _, data := range jsonData.Data {
+		for i := 0; i < len(data); i++ {
+			if data[0] == dateTW {
+				//fmt.Println(data)
+				volume = strings.Replace(data[1], ",", "", -1)
+				amount = strings.Replace(data[2], ",", "", -1)
+				count = strings.Replace(data[3], ",", "", -1)
+				break
+			}
+		}
+	}
+
+	return volume, amount, count, true
+}
+
+func fetchIndexInvestor(year int, month int, day int) (IndexInvestor, bool) {
+	var url string
+	var contents []byte
+	var jsonData jsonContent
+	var indexInvestor IndexInvestor
+
+	url = fmt.Sprintf(urlTSEIndexInvestor, year, month, day)
+	log.Println(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return indexInvestor, false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return indexInvestor, false
+	}
+
+	contents, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return indexInvestor, false
+	}
+
+	log.Println("----")
+	log.Println(resp.StatusCode)
+	log.Println(resp.Status)
+	log.Println("Body len = ", len(contents))
+
+	err = json.Unmarshal(contents, &jsonData)
+	if err != nil {
+		log.Println("json unmarshal: ", err)
+		return indexInvestor, false
+	}
+
+	if jsonData.Status != "OK" {
+		log.Println("stat: ", jsonData.Status)
+		return indexInvestor, false
+	}
+
+	for _, data := range jsonData.Data {
+		buy := strings.Replace(data[1], ",", "", -1)
+		sell := strings.Replace(data[2], ",", "", -1)
+		difference := strings.Replace(data[3], ",", "", -1)
+		if data[0] == "自營商(自行買賣)" {
+			indexInvestor.DealerSelf.Buy = buy
+			indexInvestor.DealerSelf.Sell = sell
+			indexInvestor.DealerSelf.Difference = difference
+		} else if data[0] == "自營商(避險)" {
+			indexInvestor.DealerHedge.Buy = buy
+			indexInvestor.DealerHedge.Sell = sell
+			indexInvestor.DealerHedge.Difference = difference
+		} else if data[0] == "投信" {
+			indexInvestor.Trust.Buy = buy
+			indexInvestor.Trust.Sell = sell
+			indexInvestor.Trust.Difference = difference
+		} else if data[0] == "外資及陸資" {
+			indexInvestor.Foreign.Buy = buy
+			indexInvestor.Foreign.Sell = sell
+			indexInvestor.Foreign.Difference = difference
+		} else if data[0] == "合計" {
+			indexInvestor.Total.Buy = buy
+			indexInvestor.Total.Sell = sell
+			indexInvestor.Total.Difference = difference
+		} else {
+			break
+		}
+	}
+
+	return indexInvestor, true
+}
+
+func fetchIndexMarginShort(year int, month int, day int) (IndexMarginShort, bool) {
+	var url string
+	var contents []byte
+	var jsonData jsonContent2
+	var marginShort IndexMarginShort
+
+	url = fmt.Sprintf(urlTSEIndexMarginShort, year, month, day)
+	log.Println(url)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println(err)
+		return marginShort, false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return marginShort, false
+	}
+
+	contents, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println(err)
+		return marginShort, false
+	}
+
+	log.Println("----")
+	log.Println(resp.StatusCode)
+	log.Println(resp.Status)
+	log.Println("Body len = ", len(contents))
+
+	err = json.Unmarshal(contents, &jsonData)
+	if err != nil {
+		log.Println("json unmarshal: ", err)
+		return marginShort, false
+	}
+
+	if jsonData.Status != "OK" {
+		log.Println("stat: ", jsonData.Status)
+		return marginShort, false
+	}
+
+	for _, data := range jsonData.Data {
+		todayNew := strings.Replace(data[1], ",", "", -1)
+		redemption := strings.Replace(data[2], ",", "", -1)
+		outstanding := strings.Replace(data[3], ",", "", -1)
+		lastRemain := strings.Replace(data[4], ",", "", -1)
+		todayRemain := strings.Replace(data[5], ",", "", -1)
+		if data[0] == "融資(交易單位)" {
+			marginShort.Margin.TodayNew = todayNew
+			marginShort.Margin.Redemption = redemption
+			marginShort.Margin.Outstanding = outstanding
+			marginShort.Margin.LastRemain = lastRemain
+			marginShort.Margin.TodayRemain = todayRemain
+		} else if data[0] == "融券(交易單位)" {
+			marginShort.Short.TodayNew = todayNew
+			marginShort.Short.Redemption = redemption
+			marginShort.Short.Outstanding = outstanding
+			marginShort.Short.LastRemain = lastRemain
+			marginShort.Short.TodayRemain = todayRemain
+		} else if data[0] == "融資金額(仟元)" {
+			marginShort.MarginValue.TodayNew = todayNew
+			marginShort.MarginValue.Redemption = redemption
+			marginShort.MarginValue.Outstanding = outstanding
+			marginShort.MarginValue.LastRemain = lastRemain
+			marginShort.MarginValue.TodayRemain = todayRemain
+		} else {
+			break
+		}
+	}
+
+	return marginShort, true
 }
