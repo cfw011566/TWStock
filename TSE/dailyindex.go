@@ -15,11 +15,13 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const urlTSEIndexValue = "http://www.twse.com.tw/indicesReport/MI_5MINS_HIST?response=json&date=%4d%02d%02d"
-const urlTSEIndexTrade = "http://www.twse.com.tw/exchangeReport/FMTQIK?response=json&date=%4d%02d%02d"
-const urlTSEIndexInvestor = "http://www.twse.com.tw/fund/BFI82U?response=json&dayDate=%4d%02d%02d&type=day"
-const urlTSEIndexMarginShort = "http://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date=%4d%02d%02d&selectType=MS"
-const kMinDate = 20000000
+const (
+	urlTSEIndexValue       = "http://www.twse.com.tw/indicesReport/MI_5MINS_HIST?response=json&date=%4d%02d%02d"
+	urlTSEIndexTrade       = "http://www.twse.com.tw/exchangeReport/FMTQIK?response=json&date=%4d%02d%02d"
+	urlTSEIndexInvestor    = "http://www.twse.com.tw/fund/BFI82U?response=json&dayDate=%4d%02d%02d&type=day"
+	urlTSEIndexMarginShort = "http://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date=%4d%02d%02d&selectType=MS"
+	kMinDate               = 20000000
+)
 
 const (
 	DB_USER     = "stock"
@@ -147,10 +149,17 @@ func main() {
 			quoteDate = quoteDate.AddDate(0, 0, -1)
 			continue
 		}
+
 		fmt.Println(o, h, l, c)
 		fmt.Println(volume, amount, count)
 		fmt.Println(indexInvestor)
 		fmt.Println(indexMarginShort)
+
+		dateString := fmt.Sprintf("%4d%02d%02d", quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
+		writeIndexQuote(db, dateString, o, h, l, c, volume, amount, count)
+		writeIndexInvestor(db, dateString, indexInvestor)
+		writeIndexMarginShort(db, dateString, indexMarginShort)
+
 		if *flagLastTradeDay {
 			break
 		}
@@ -431,4 +440,92 @@ func fetchIndexMarginShort(year int, month int, day int) (IndexMarginShort, bool
 	}
 
 	return marginShort, true
+}
+
+func writeIndexQuote(db *sql.DB, date, o, h, l, c, volume, amount, count string) bool {
+	sqlString := "DELETE FROM index_values WHERE trade_date='" + date + "';"
+	//err := db.QueryRow(sqlString).Scan(&lastInsertId)
+	_, err := db.Exec(sqlString)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("DELETE error = %v\n", err)
+		return false
+	}
+
+	sqlString = fmt.Sprintf("INSERT INTO index_values VALUES ('%s', 'TAIEX', '%s', '%s', '%s', '%s', '%s', '%s', '%s');",
+		date, o, h, l, c, volume, amount, count)
+	//fmt.Println(sqlString)
+	_, err = db.Exec(sqlString)
+	if err != nil {
+		log.Println("db.Exec", err)
+		return false
+	}
+	return true
+}
+
+func writeIndexInvestor(db *sql.DB, date string, investor IndexInvestor) bool {
+	sqlString := "DELETE FROM index_investors WHERE trade_date='" + date + "';"
+	//err := db.QueryRow(sqlString).Scan(&lastInsertId)
+	_, err := db.Exec(sqlString)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("DELETE error = %v\n", err)
+		return false
+	}
+
+	sqlString = fmt.Sprintf("INSERT INTO index_investors VALUES ('%s', 'TAIEX', ", date)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerSelf.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerSelf.Sell)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerSelf.Difference)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerHedge.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerHedge.Sell)
+	sqlString += fmt.Sprintf("'%s', ", investor.DealerHedge.Difference)
+	sqlString += fmt.Sprintf("'%s', ", investor.Trust.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.Trust.Sell)
+	sqlString += fmt.Sprintf("'%s', ", investor.Trust.Difference)
+	sqlString += fmt.Sprintf("'%s', ", investor.Foreign.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.Foreign.Sell)
+	sqlString += fmt.Sprintf("'%s', ", investor.Foreign.Difference)
+	sqlString += fmt.Sprintf("'%s', ", investor.Total.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.Total.Sell)
+	sqlString += fmt.Sprintf("'%s');", investor.Total.Difference)
+	//fmt.Println(sqlString)
+	_, err = db.Exec(sqlString)
+	if err != nil {
+		log.Println("db.Exec", err)
+		return false
+	}
+	return true
+}
+
+func writeIndexMarginShort(db *sql.DB, date string, data IndexMarginShort) bool {
+	sqlString := "DELETE FROM index_margin_short WHERE trade_date='" + date + "';"
+	//err := db.QueryRow(sqlString).Scan(&lastInsertId)
+	_, err := db.Exec(sqlString)
+	if err != nil && err != sql.ErrNoRows {
+		log.Printf("DELETE error = %v\n", err)
+		return false
+	}
+
+	sqlString = fmt.Sprintf("INSERT INTO index_margin_short VALUES ('%s', 'TAIEX', ", date)
+	sqlString += fmt.Sprintf("'%s', ", data.Margin.TodayNew)
+	sqlString += fmt.Sprintf("'%s', ", data.Margin.Redemption)
+	sqlString += fmt.Sprintf("'%s', ", data.Margin.Outstanding)
+	sqlString += fmt.Sprintf("'%s', ", data.Margin.LastRemain)
+	sqlString += fmt.Sprintf("'%s', ", data.Margin.TodayRemain)
+	sqlString += fmt.Sprintf("'%s', ", data.Short.TodayNew)
+	sqlString += fmt.Sprintf("'%s', ", data.Short.Redemption)
+	sqlString += fmt.Sprintf("'%s', ", data.Short.Outstanding)
+	sqlString += fmt.Sprintf("'%s', ", data.Short.LastRemain)
+	sqlString += fmt.Sprintf("'%s', ", data.Short.TodayRemain)
+	sqlString += fmt.Sprintf("'%s', ", data.MarginValue.TodayNew)
+	sqlString += fmt.Sprintf("'%s', ", data.MarginValue.Redemption)
+	sqlString += fmt.Sprintf("'%s', ", data.MarginValue.Outstanding)
+	sqlString += fmt.Sprintf("'%s', ", data.MarginValue.LastRemain)
+	sqlString += fmt.Sprintf("'%s');", data.MarginValue.TodayRemain)
+	//fmt.Println(sqlString)
+	_, err = db.Exec(sqlString)
+	if err != nil {
+		log.Println("db.Exec", err)
+		return false
+	}
+	return true
 }
