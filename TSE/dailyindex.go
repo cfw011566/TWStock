@@ -353,7 +353,7 @@ func fetchIndexInvestor(year int, month int, day int) (IndexInvestor, bool) {
 			indexInvestor.Trust.Buy = buy
 			indexInvestor.Trust.Sell = sell
 			indexInvestor.Trust.Difference = difference
-		} else if data[0] == "外資及陸資" {
+		} else if strings.Contains(data[0], "外資及陸資") {
 			indexInvestor.Foreign.Buy = buy
 			indexInvestor.Foreign.Sell = sell
 			indexInvestor.Foreign.Difference = difference
@@ -361,6 +361,7 @@ func fetchIndexInvestor(year int, month int, day int) (IndexInvestor, bool) {
 			indexInvestor.Total.Buy = buy
 			indexInvestor.Total.Sell = sell
 			indexInvestor.Total.Difference = difference
+		} else if data[0] == "外資自營商" {
 		} else {
 			break
 		}
@@ -456,7 +457,7 @@ func writeIndexQuote(db *sql.DB, date, o, h, l, c, volume, amount, count string)
 	//fmt.Println(sqlString)
 	_, err = db.Exec(sqlString)
 	if err != nil {
-		log.Println("db.Exec", err)
+		log.Println("writeIndexQuote", err)
 		return false
 	}
 	return true
@@ -490,7 +491,7 @@ func writeIndexInvestor(db *sql.DB, date string, investor IndexInvestor) bool {
 	//fmt.Println(sqlString)
 	_, err = db.Exec(sqlString)
 	if err != nil {
-		log.Println("db.Exec", err)
+		log.Println("writeIndexInvestor", err)
 		return false
 	}
 	return true
@@ -524,7 +525,7 @@ func writeIndexMarginShort(db *sql.DB, date string, data IndexMarginShort) bool 
 	//fmt.Println(sqlString)
 	_, err = db.Exec(sqlString)
 	if err != nil {
-		log.Println("db.Exec", err)
+		log.Println("writeIndexMarginShort", err)
 		return false
 	}
 	return true
