@@ -82,6 +82,7 @@ func main() {
 	log.Println("beginDate = ", beginDate)
 	for quoteDate.After(beginDate) {
 		log.Println(quoteDate)
+		time.Sleep(1 * time.Second)
 		quotes, ok := getDailyInvestors(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if ok {
 			writeDailyInvestors(db, quotes)
@@ -104,20 +105,38 @@ func writeDailyInvestors(db *sql.DB, quotes *DailyInvestor) bool {
 	}
 
 	// "fields":["證券代號","證券名稱","外陸資買進股數(不含外資自營商)","外陸資賣出股數(不>含外資自營商)","外陸資買賣超股數(不含外資自營商)","外資自營商買進股數","外資自營商賣出股數","外資自營商買賣超股數","投信買進股數","投信賣出股數","投信買賣超股數","自營商買賣超股數","自營商買進股數(自行買賣)","自營商賣出股數(自行買賣)","自營商買賣超股數(自行買賣)","自營商買進股數(避險)","自營商賣出股數(避險)","自營>商買賣超股數(避險)","三大法人買賣超股數"]
-	sqlString = "INSERT INTO daily_investors (trade_date, security_code, foreign_buy, foreign_sell, foreign_diff, trust_buy, trust_sell, trust_diff, dealer_diff, dealer_self_buy, dealer_self_sell, dealer_self_diff, dealer_hedge_buy, dealer_hedge_sell, dealer_hedge_diff, investors_diff) VALUES\n"
+	sqlString = "INSERT INTO daily_investors (trade_date, security_code, foreign_buy, foreign_sell, foreign_diff, foreign_self_buy, foreign_self_sell, foreign_self_diff, trust_buy, trust_sell, trust_diff, dealer_diff, dealer_self_buy, dealer_self_sell, dealer_self_diff, dealer_hedge_buy, dealer_hedge_sell, dealer_hedge_diff, investors_diff) VALUES\n"
 	for _, quote := range quotes.Data {
 		sqlString += fmt.Sprintf("('%s',", quotes.Date)
+		quoteDateInt, err := strconv.Atoi(quotes.Date)
+		if err != nil {
+			log.Println("writeDailyInvestors: ", err)
+		}
 		for i := 0; i < len(quote); i++ {
-			if i == 1 || i == 5 || i == 6 || i == 7 {
+			if i == 1 {
 				continue
 			}
-			if strings.Contains(quote[i], "--") || len(quote[i]) == 0 {
-				sqlString += " null"
+			if quoteDateInt >= 20171218 {
+				if strings.Contains(quote[i], "--") || len(quote[i]) == 0 {
+					sqlString += " null"
+				} else {
+					sqlString += " '" + strings.Replace(quote[i], ",", "", -1) + "'"
+				}
+				if i != 18 {
+					sqlString += ","
+				}
 			} else {
-				sqlString += " '" + strings.Replace(quote[i], ",", "", -1) + "'"
-			}
-			if i != 18 {
-				sqlString += ","
+				if i == 5 {
+					sqlString += " '0', '0', '0',"
+				}
+				if strings.Contains(quote[i], "--") || len(quote[i]) == 0 {
+					sqlString += " null"
+				} else {
+					sqlString += " '" + strings.Replace(quote[i], ",", "", -1) + "'"
+				}
+				if i != 15 {
+					sqlString += ","
+				}
 			}
 		}
 		sqlString += "),\n"
@@ -126,7 +145,7 @@ func writeDailyInvestors(db *sql.DB, quotes *DailyInvestor) bool {
 	//fmt.Println(sqlString)
 	result, err = db.Exec(sqlString)
 	if err != nil {
-		log.Println(err)
+		log.Println("writeDailyInvestors: ", err)
 		return false
 	}
 	return true

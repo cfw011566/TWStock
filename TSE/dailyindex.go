@@ -56,6 +56,7 @@ type IndexInvestor struct {
 	Trust       Investor
 	Foreign     Investor
 	Total       Investor
+	ForeignSelf Investor
 }
 
 type MarginShortFields struct {
@@ -121,28 +122,28 @@ func main() {
 	for quoteDate.After(beginDate) {
 		fmt.Println("-------")
 		fmt.Println(quoteDate)
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 		o, h, l, c, ok := fetchIndexValue(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if !ok {
 			log.Println(o, h, l, c)
 			quoteDate = quoteDate.AddDate(0, 0, -1)
 			continue
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		volume, amount, count, ok := fetchIndexTrade(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if !ok {
 			log.Println(volume, amount, count)
 			quoteDate = quoteDate.AddDate(0, 0, -1)
 			continue
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		indexInvestor, ok := fetchIndexInvestor(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if !ok {
 			log.Println(indexInvestor)
 			quoteDate = quoteDate.AddDate(0, 0, -1)
 			continue
 		}
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 		indexMarginShort, ok := fetchIndexMarginShort(quoteDate.Year(), int(quoteDate.Month()), quoteDate.Day())
 		if !ok {
 			log.Println(indexInvestor)
@@ -341,6 +342,10 @@ func fetchIndexInvestor(year int, month int, day int) (IndexInvestor, bool) {
 		buy := strings.Replace(data[1], ",", "", -1)
 		sell := strings.Replace(data[2], ",", "", -1)
 		difference := strings.Replace(data[3], ",", "", -1)
+
+		indexInvestor.ForeignSelf.Buy = "0"
+		indexInvestor.ForeignSelf.Sell = "0"
+		indexInvestor.ForeignSelf.Difference = "0"
 		if data[0] == "自營商(自行買賣)" {
 			indexInvestor.DealerSelf.Buy = buy
 			indexInvestor.DealerSelf.Sell = sell
@@ -362,6 +367,9 @@ func fetchIndexInvestor(year int, month int, day int) (IndexInvestor, bool) {
 			indexInvestor.Total.Sell = sell
 			indexInvestor.Total.Difference = difference
 		} else if data[0] == "外資自營商" {
+			indexInvestor.ForeignSelf.Buy = buy
+			indexInvestor.ForeignSelf.Sell = sell
+			indexInvestor.ForeignSelf.Difference = difference
 		} else {
 			break
 		}
@@ -487,8 +495,11 @@ func writeIndexInvestor(db *sql.DB, date string, investor IndexInvestor) bool {
 	sqlString += fmt.Sprintf("'%s', ", investor.Foreign.Difference)
 	sqlString += fmt.Sprintf("'%s', ", investor.Total.Buy)
 	sqlString += fmt.Sprintf("'%s', ", investor.Total.Sell)
-	sqlString += fmt.Sprintf("'%s');", investor.Total.Difference)
-	//fmt.Println(sqlString)
+	sqlString += fmt.Sprintf("'%s', ", investor.Total.Difference)
+	sqlString += fmt.Sprintf("'%s', ", investor.ForeignSelf.Buy)
+	sqlString += fmt.Sprintf("'%s', ", investor.ForeignSelf.Sell)
+	sqlString += fmt.Sprintf("'%s');", investor.ForeignSelf.Difference)
+	// fmt.Println(sqlString)
 	_, err = db.Exec(sqlString)
 	if err != nil {
 		log.Println("writeIndexInvestor", err)
