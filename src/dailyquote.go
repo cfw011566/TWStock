@@ -299,10 +299,10 @@ func writeOTCDailyQuotes(db *sql.DB, year, month, day int, csvString string) boo
 			}
 			sqlString += ","
 			if i == 10 {
-				sqlString += " 0,"
+				sqlString += " null,"
 			}
 			if i == 11 {
-				sqlString += " 0"
+				sqlString += " null"
 				break
 			}
 		}
